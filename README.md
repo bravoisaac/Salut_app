@@ -1,4 +1,4 @@
 - iniciar front
--- \SalutAPP\Frontend\salutapp> ionic serve
+- \SalutAPP\Frontend\salutapp> ionic serve
 - iniciar backend
 - SalutAPP\Backend\api> php artisan serve --host=0.0.0.0 --port=8000
