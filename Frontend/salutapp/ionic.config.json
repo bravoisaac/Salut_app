@@ -1,0 +1,7 @@
+{
+  "name": "salutapp",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

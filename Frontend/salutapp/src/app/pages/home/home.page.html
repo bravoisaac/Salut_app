@@ -1,0 +1,101 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Servicios / Productos</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <!-- Formulario para crear nuevo -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Nuevo registro</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+
+      <ion-item>
+        <ion-input
+          label="Nombre"
+          labelPlacement="floating"
+          [(ngModel)]="nuevo.name">
+        </ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-textarea
+          label="Descripción"
+          labelPlacement="floating"
+          [(ngModel)]="nuevo.description">
+        </ion-textarea>
+      </ion-item>
+
+      <ion-item>
+        <ion-input
+          type="number"
+          label="Precio"
+          labelPlacement="floating"
+          [(ngModel)]="nuevo.price">
+        </ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-input
+          type="date"
+          label="Fecha"
+          labelPlacement="stacked"
+          [(ngModel)]="nuevo.fecha">
+        </ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-select
+          label="Aprobación"
+          labelPlacement="stacked"
+          [(ngModel)]="nuevo.estado_aprobacion">
+          <ion-select-option value="pendiente">Pendiente</ion-select-option>
+          <ion-select-option value="aprobado">Aprobado</ion-select-option>
+          <ion-select-option value="rechazado">Rechazado</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-item>
+        <ion-select
+          label="Proceso"
+          labelPlacement="stacked"
+          [(ngModel)]="nuevo.estado_proceso">
+          <ion-select-option value="en_proceso">En proceso</ion-select-option>
+          <ion-select-option value="confirmado">Confirmado</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-button expand="block" (click)="crearRegistro()" [disabled]="saving">
+        Guardar
+      </ion-button>
+
+      <ion-text color="danger" *ngIf="errorMsg">{{ errorMsg }}</ion-text>
+
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Lista -->
+  <ion-list *ngIf="products.length">
+    <ion-item *ngFor="let p of products">
+      <ion-label>
+        <h2>{{ p.name }} - {{ p.price | currency:'CLP':'symbol-narrow' }}</h2>
+        <p>
+          {{ p.description }}<br>
+          Fecha: {{ p.fecha }}<br>
+          Aprobación: <strong>{{ p.estado_aprobacion }}</strong><br>
+          Proceso: <strong>{{ p.estado_proceso }}</strong>
+        </p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ion-text color="medium" *ngIf="!products.length && !loadingList">
+    No hay registros todavía.
+  </ion-text>
+
+  <ion-spinner *ngIf="loadingList"></ion-spinner>
+
+</ion-content>

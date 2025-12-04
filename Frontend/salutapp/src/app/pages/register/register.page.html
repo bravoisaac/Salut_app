@@ -1,0 +1,47 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Registro </ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <ion-item>
+    <ion-input
+      label="Nombre"
+      labelPlacement="floating"
+      [(ngModel)]="name">
+    </ion-input>
+  </ion-item>
+  <ion-text color="danger" *ngIf="errors?.name">{{ errors.name[0] }}</ion-text>
+
+  <ion-item>
+    <ion-input
+      label="Email"
+      labelPlacement="floating"
+      type="email"
+      [(ngModel)]="email">
+    </ion-input>
+  </ion-item>
+  <ion-text color="danger" *ngIf="errors?.email">{{ errors.email[0] }}</ion-text>
+
+  <ion-item>
+    <ion-input
+      label="Contraseña"
+      labelPlacement="floating"
+      type="password"
+      [(ngModel)]="password">
+    </ion-input>
+  </ion-item>
+  <ion-text color="danger" *ngIf="errors?.password">{{ errors.password[0] }}</ion-text>
+
+  <ion-button expand="block" (click)="submit()" [disabled]="loading">
+    Crear cuenta
+  </ion-button>
+
+  <ion-button expand="block" fill="clear" routerLink="/login">
+    Ya tengo cuenta
+  </ion-button>
+
+  <ion-text color="success" *ngIf="successMsg">{{ successMsg }}</ion-text>
+</ion-content>
