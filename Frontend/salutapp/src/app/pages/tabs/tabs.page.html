@@ -1,5 +1,12 @@
 <ion-tabs>
-  <ion-tab-bar slot="bottom">
+  <ion-tab-bar slot="bottom" aria-label="Navegación principal">
+    <div class="tab-brand" aria-hidden="true">
+      <span class="tab-brand__mark"><ion-icon name="pulse-outline"></ion-icon></span>
+      <span class="tab-brand__copy">
+        <strong>Salut</strong>
+        <small>Tu red de bienestar</small>
+      </span>
+    </div>
     <ion-tab-button tab="jobs" routerLink="/app/jobs">
       <ion-icon name="briefcase-outline"></ion-icon>
       <ion-label>Empleos</ion-label>

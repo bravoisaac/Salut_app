@@ -1,6 +1,9 @@
-import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit } from '@angular/core';
+import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
+
+import { ModerationReport, ReportStatus, VerificationRequest } from '../../app.models';
 import { AdminService } from '../../services/admin.service';
 import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state.component';
@@ -10,24 +13,32 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state.
   templateUrl: './admin.page.html',
   styleUrls: ['./admin.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, EmptyStateComponent, LoadingStateComponent],
+  imports: [IonicModule, CommonModule, RouterModule, EmptyStateComponent, LoadingStateComponent],
 })
 export class AdminPage implements OnInit {
+  private readonly adminService = inject(AdminService);
   loadingVerifications = false;
   updatingVerificationId: number | null = null;
   verificationError = '';
   verificationSuccess = '';
-  verifications: any[] = [];
+  verifications: VerificationRequest[] = [];
 
   loadingReports = false;
   updatingReportId: number | null = null;
   reportError = '';
   reportSuccess = '';
-  reports: any[] = [];
+  reports: ModerationReport[] = [];
 
-  constructor(private adminService: AdminService) {}
+  get isRefreshing() {
+    return this.loadingVerifications || this.loadingReports;
+  }
 
   ngOnInit() {
+    this.refreshAll();
+  }
+
+  refreshAll() {
+    if (this.isRefreshing) return;
     this.loadVerifications();
     this.loadReports();
   }
@@ -35,94 +46,83 @@ export class AdminPage implements OnInit {
   loadVerifications() {
     this.loadingVerifications = true;
     this.verificationError = '';
-
-    this.adminService.listVerifications().subscribe({
-      next: (res: any) => {
-        this.verifications = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-      },
-      error: (err: any) => {
-        this.verificationError = err?.error?.message || 'No se pudieron cargar las verificaciones';
-      },
-    }).add(() => {
-      this.loadingVerifications = false;
-    });
+    this.adminService.listVerifications('pending').subscribe({
+      next: (res) => this.verifications = Array.isArray(res?.data) ? res.data : [],
+      error: (err) => this.verificationError = err?.error?.message || 'No se pudieron cargar las verificaciones.',
+    }).add(() => this.loadingVerifications = false);
   }
 
-  verificationName(item: any) {
-    return item?.user?.name || item?.user?.email || `Usuario #${item?.user_id || '-'}`;
+  verificationName(item: VerificationRequest) {
+    return item.user?.name || item.user?.email || `Usuario #${item.user_id || '-'}`;
   }
 
-  reviewVerification(item: any, action: 'approve' | 'reject') {
-    if (!item?.id || this.updatingVerificationId) {
-      return;
-    }
-
-    this.updatingVerificationId = Number(item.id);
+  reviewVerification(item: VerificationRequest, action: 'approve' | 'reject') {
+    if (!item.id || this.updatingVerificationId !== null) return;
+    this.updatingVerificationId = item.id;
     this.verificationError = '';
     this.verificationSuccess = '';
-
     const request = action === 'approve'
-      ? this.adminService.approveVerification(Number(item.id))
-      : this.adminService.rejectVerification(Number(item.id));
-
+      ? this.adminService.approveVerification(item.id)
+      : this.adminService.rejectVerification(item.id);
     request.subscribe({
-      next: (updated: any) => {
-        this.verifications = this.verifications.map(current => current.id === item.id ? { ...current, ...updated } : current);
-        this.verificationSuccess = action === 'approve' ? 'Verificacion aprobada' : 'Verificacion rechazada';
+      next: () => {
+        this.verifications = this.verifications.filter(current => current.id !== item.id);
+        this.verificationSuccess = action === 'approve' ? 'La verificación fue aprobada correctamente.' : 'La verificación fue rechazada.';
       },
-      error: (err: any) => {
-        this.verificationError = err?.error?.message || 'No se pudo revisar la verificacion';
-      },
-    }).add(() => {
-      this.updatingVerificationId = null;
-    });
+      error: (err) => this.verificationError = err?.error?.message || 'No se pudo revisar la verificación.',
+    }).add(() => this.updatingVerificationId = null);
   }
 
   loadReports() {
     this.loadingReports = true;
     this.reportError = '';
-
-    this.adminService.listReports().subscribe({
-      next: (res: any) => {
-        this.reports = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-      },
-      error: (err: any) => {
-        this.reportError = err?.error?.message || 'No se pudieron cargar los reportes';
-      },
-    }).add(() => {
-      this.loadingReports = false;
-    });
+    this.adminService.listReports('open').subscribe({
+      next: (res) => this.reports = Array.isArray(res?.data) ? res.data : [],
+      error: (err) => this.reportError = err?.error?.message || 'No se pudieron cargar los reportes.',
+    }).add(() => this.loadingReports = false);
   }
 
-  reportTitle(report: any) {
-    const targetType = report?.target_type || report?.targetType || 'Elemento';
-    const targetId = report?.target_id || report?.targetId || '-';
-    return `${targetType} #${targetId}`;
+  reportTitle(report: ModerationReport) {
+    return `${this.targetLabel(report.target_type)} #${report.target_id || '-'}`;
   }
 
-  reporterName(report: any) {
-    return report?.reporter?.name || report?.reporter?.email || `Usuario #${report?.reporter_id || '-'}`;
+  reporterName(report: ModerationReport) {
+    return report.reporter?.name || report.reporter?.email || `Usuario #${report.reporter_id || '-'}`;
   }
 
-  updateReport(report: any, status: 'resolved' | 'dismissed') {
-    if (!report?.id || this.updatingReportId) {
-      return;
-    }
-
-    this.updatingReportId = Number(report.id);
+  updateReport(report: ModerationReport, status: Extract<ReportStatus, 'resolved' | 'dismissed'>) {
+    if (!report.id || this.updatingReportId !== null) return;
+    this.updatingReportId = report.id;
     this.reportError = '';
     this.reportSuccess = '';
+    this.adminService.updateReportStatus(report.id, status).subscribe({
+      next: () => {
+        this.reports = this.reports.filter(current => current.id !== report.id);
+        this.reportSuccess = status === 'resolved' ? 'El reporte fue marcado como resuelto.' : 'El reporte fue desestimado.';
+      },
+      error: (err) => this.reportError = err?.error?.message || 'No se pudo actualizar el reporte.',
+    }).add(() => this.updatingReportId = null);
+  }
 
-    this.adminService.updateReportStatus(Number(report.id), status).subscribe({
-      next: (updated: any) => {
-        this.reports = this.reports.map(current => current.id === report.id ? { ...current, ...updated } : current);
-        this.reportSuccess = status === 'resolved' ? 'Reporte resuelto' : 'Reporte desestimado';
-      },
-      error: (err: any) => {
-        this.reportError = err?.error?.message || 'No se pudo actualizar el reporte';
-      },
-    }).add(() => {
-      this.updatingReportId = null;
-    });
+  initials(value: string) {
+    return value.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
+  }
+
+  roleLabel(role: VerificationRequest['role']) {
+    return role === 'health' ? 'Profesional de salud' : 'Empresa';
+  }
+
+  targetLabel(targetType: string) {
+    const labels: Record<string, string> = { post: 'Publicación', user: 'Usuario', job: 'Empleo', company: 'Empresa', health_profile: 'Perfil de salud' };
+    return labels[targetType.toLowerCase()] || 'Elemento';
+  }
+
+  formatDate(value: string) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Fecha no disponible' : new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+  }
+
+  trackById(_: number, item: { id: number }) {
+    return item.id;
   }
 }

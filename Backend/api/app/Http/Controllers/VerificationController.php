@@ -12,14 +12,20 @@ class VerificationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
+        $data = $request->validate([
+            'status' => 'nullable|in:pending,approved,rejected',
+            'per_page' => 'nullable|integer|min:1|max:50',
+        ]);
+
         $verifications = VerificationRequest::query()
             ->with('user:id,name,email,role')
+            ->when(isset($data['status']), fn ($query) => $query->where('status', $data['status']))
             ->latest()
-            ->paginate(20);
+            ->paginate($data['per_page'] ?? 20);
 
         return response()->json($verifications);
     }
@@ -32,7 +38,7 @@ class VerificationController extends Controller
         ]);
 
         $user = $request->user();
-        if (!$user->isAdmin() && $user->role !== $data['role']) {
+        if (! $user->isAdmin() && $user->role !== $data['role']) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
@@ -59,11 +65,11 @@ class VerificationController extends Controller
     private function review(Request $request, VerificationRequest $verification, string $status)
     {
         $user = $request->user();
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        if (!in_array($status, ['approved', 'rejected'], true)) {
+        if (! in_array($status, ['approved', 'rejected'], true)) {
             return response()->json(['message' => 'Estado de revision no permitido'], 422);
         }
 
@@ -88,6 +94,7 @@ class VerificationController extends Controller
             HealthProfile::query()
                 ->where('user_id', $verification->user_id)
                 ->update(['verification_status' => $status]);
+
             return;
         }
 

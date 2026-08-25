@@ -1,28 +1,38 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import {
+  ApiPage,
+  ModerationReport,
+  ReportStatus,
+  VerificationRequest,
+} from '../app.models';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
-  constructor(private http: HttpClient) {}
+  private readonly http = inject(HttpClient);
 
-  listVerifications() {
-    return this.http.get(`${environment.apiBase}/verifications`);
+  listVerifications(status: 'pending' | 'approved' | 'rejected' = 'pending') {
+    return this.http.get<ApiPage<VerificationRequest>>(`${environment.apiBase}/verifications`, {
+      params: { status },
+    });
   }
 
   approveVerification(id: number) {
-    return this.http.put(`${environment.apiBase}/verifications/${id}/approve`, {});
+    return this.http.put<VerificationRequest>(`${environment.apiBase}/verifications/${id}/approve`, {});
   }
 
   rejectVerification(id: number) {
-    return this.http.put(`${environment.apiBase}/verifications/${id}/reject`, {});
+    return this.http.put<VerificationRequest>(`${environment.apiBase}/verifications/${id}/reject`, {});
   }
 
-  listReports() {
-    return this.http.get(`${environment.apiBase}/reports`);
+  listReports(status: ReportStatus = 'open') {
+    return this.http.get<ApiPage<ModerationReport>>(`${environment.apiBase}/reports`, {
+      params: { status },
+    });
   }
 
-  updateReportStatus(id: number, status: 'open' | 'resolved' | 'dismissed') {
-    return this.http.put(`${environment.apiBase}/reports/${id}`, { status });
+  updateReportStatus(id: number, status: ReportStatus) {
+    return this.http.put<ModerationReport>(`${environment.apiBase}/reports/${id}`, { status });
   }
 }

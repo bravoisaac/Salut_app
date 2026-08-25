@@ -25,7 +25,7 @@ Puedes entrar a la aplicacion con el siguiente usuario de prueba:
 Ruta recomendada para iniciar sesion:
 
 ```text
-http://localhost:8100/login
+http://localhost:4200/login
 ```
 
 ## Capturas del sistema

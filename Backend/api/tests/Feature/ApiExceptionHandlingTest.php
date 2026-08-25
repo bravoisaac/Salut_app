@@ -50,4 +50,16 @@ class ApiExceptionHandlingTest extends TestCase
                 'message' => 'Metodo no permitido.',
             ]);
     }
+
+    public function test_documented_local_frontend_origin_is_allowed_by_cors(): void
+    {
+        $response = $this->withHeaders([
+            'Origin' => 'http://localhost:4200',
+            'Access-Control-Request-Method' => 'POST',
+        ])->options('/api/login');
+
+        $response
+            ->assertNoContent()
+            ->assertHeader('Access-Control-Allow-Origin', 'http://localhost:4200');
+    }
 }

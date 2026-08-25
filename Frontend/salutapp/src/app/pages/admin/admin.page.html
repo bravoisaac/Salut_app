@@ -1,117 +1,120 @@
 <ion-content class="feed-content" [fullscreen]="true">
-  <div class="feed-shell">
-    <header class="feed-header">
+  <div class="feed-shell admin-shell">
+    <header class="feed-header admin-header">
       <div class="feed-header-inner">
-        <h1 class="feed-title">Panel Admin</h1>
-        <p class="feed-subtitle">Acceso restringido</p>
+        <div class="admin-header__nav">
+          <ion-button fill="clear" routerLink="/app/profile" aria-label="Volver al perfil">
+            <ion-icon slot="start" name="arrow-back-outline" aria-hidden="true"></ion-icon>
+            Volver
+          </ion-button>
+          <span class="admin-eyebrow">
+            <ion-icon name="shield-checkmark-outline" aria-hidden="true"></ion-icon>
+            Centro de confianza
+          </span>
+        </div>
+        <div class="admin-header__title-row">
+          <div>
+            <h1 class="feed-title">Panel de administración</h1>
+            <p class="feed-subtitle">Revisa solicitudes y reportes desde una vista operativa.</p>
+          </div>
+          <ion-button class="refresh-button" fill="outline" (click)="refreshAll()" [disabled]="isRefreshing">
+            <ion-spinner *ngIf="isRefreshing" name="crescent" aria-hidden="true"></ion-spinner>
+            <ion-icon *ngIf="!isRefreshing" slot="start" name="refresh-outline" aria-hidden="true"></ion-icon>
+            {{ isRefreshing ? 'Actualizando' : 'Actualizar' }}
+          </ion-button>
+        </div>
       </div>
     </header>
 
-    <section class="feed-body" aria-label="Panel admin">
-      <ion-card>
-    <ion-card-header>
-      <ion-card-title>Verificaciones</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-text color="danger" *ngIf="verificationError">{{ verificationError }}</ion-text>
-      <ion-text color="success" *ngIf="verificationSuccess">{{ verificationSuccess }}</ion-text>
-      <app-loading-state
-        *ngIf="loadingVerifications"
-        [compact]="true"
-        title="Cargando verificaciones"
-        description="Buscando solicitudes pendientes."
-      ></app-loading-state>
-      <ion-list>
-        <ion-item *ngFor="let item of verifications">
-          <ion-label>
-            <h2>{{ verificationName(item) }}</h2>
-            <p>{{ item.role }} - {{ item.status }}</p>
-          </ion-label>
-          <ion-button
-            slot="end"
-            size="small"
-            color="success"
-            *ngIf="item.status === 'pending'"
-            [disabled]="updatingVerificationId === item.id"
-            (click)="reviewVerification(item, 'approve')"
-          >
-            Aprobar
-          </ion-button>
-          <ion-button
-            slot="end"
-            size="small"
-            color="danger"
-            fill="outline"
-            *ngIf="item.status === 'pending'"
-            [disabled]="updatingVerificationId === item.id"
-            (click)="reviewVerification(item, 'reject')"
-          >
-            Rechazar
-          </ion-button>
-        </ion-item>
-      </ion-list>
-      <app-empty-state
-        *ngIf="!loadingVerifications && !verifications.length"
-        [compact]="true"
-        icon="shield-checkmark-outline"
-        title="Sin verificaciones pendientes"
-        description="Las nuevas solicitudes apareceran aqui para revision."
-      ></app-empty-state>
-    </ion-card-content>
-  </ion-card>
+    <main class="feed-body admin-body" aria-label="Panel de administración">
+      <section class="admin-summary" aria-label="Resumen de pendientes">
+        <article class="summary-card">
+          <span class="summary-card__icon"><ion-icon name="ribbon-outline" aria-hidden="true"></ion-icon></span>
+          <span><strong>{{ verifications.length }}</strong><small>verificaciones pendientes</small></span>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__icon summary-card__icon--report"><ion-icon name="flag-outline" aria-hidden="true"></ion-icon></span>
+          <span><strong>{{ reports.length }}</strong><small>reportes abiertos</small></span>
+        </article>
+      </section>
 
-      <ion-card>
-    <ion-card-header>
-      <ion-card-title>Reportes</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-text color="danger" *ngIf="reportError">{{ reportError }}</ion-text>
-      <ion-text color="success" *ngIf="reportSuccess">{{ reportSuccess }}</ion-text>
-      <app-loading-state
-        *ngIf="loadingReports"
-        [compact]="true"
-        title="Cargando reportes"
-        description="Revisando casos abiertos."
-      ></app-loading-state>
-      <ion-list>
-        <ion-item *ngFor="let report of reports">
-          <ion-label>
-            <h2>{{ reportTitle(report) }}</h2>
-            <p>{{ report.reason }} - {{ report.status }}</p>
-            <p>Reportado por {{ reporterName(report) }}</p>
-          </ion-label>
-          <ion-button
-            slot="end"
-            size="small"
-            fill="outline"
-            *ngIf="report.status === 'open'"
-            [disabled]="updatingReportId === report.id"
-            (click)="updateReport(report, 'resolved')"
-          >
-            Resolver
-          </ion-button>
-          <ion-button
-            slot="end"
-            size="small"
-            color="medium"
-            fill="clear"
-            *ngIf="report.status === 'open'"
-            [disabled]="updatingReportId === report.id"
-            (click)="updateReport(report, 'dismissed')"
-          >
-            Desestimar
-          </ion-button>
-        </ion-item>
-      </ion-list>
-      <app-empty-state
-        *ngIf="!loadingReports && !reports.length"
-        [compact]="true"
-        icon="flag-outline"
-        title="Sin reportes pendientes"
-        description="Los reportes abiertos quedaran disponibles en esta seccion."
-      ></app-empty-state>
-    </ion-card-content>
-      </ion-card>
-    </section>
+      <div class="admin-notice admin-notice--error" role="alert" *ngIf="verificationError || reportError">
+        <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+        <span>{{ verificationError || reportError }}</span>
+        <ion-button fill="clear" size="small" (click)="refreshAll()">Reintentar</ion-button>
+      </div>
+      <div class="admin-notice admin-notice--success" role="status" *ngIf="verificationSuccess || reportSuccess">
+        <ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>
+        <span>{{ verificationSuccess || reportSuccess }}</span>
+      </div>
+
+      <div class="admin-grid">
+        <section class="admin-panel" aria-labelledby="verification-heading">
+          <div class="panel-heading">
+            <span class="panel-heading__icon"><ion-icon name="person-add-outline" aria-hidden="true"></ion-icon></span>
+            <div><h2 id="verification-heading">Verificaciones</h2><p>Profesionales y empresas que esperan revisión.</p></div>
+            <span class="panel-count">{{ verifications.length }}</span>
+          </div>
+
+          <app-loading-state *ngIf="loadingVerifications" [compact]="true" title="Cargando verificaciones" description="Buscando solicitudes pendientes."></app-loading-state>
+
+          <div class="review-list" *ngIf="!loadingVerifications && verifications.length">
+            <article class="review-item" *ngFor="let item of verifications; trackBy: trackById">
+              <div class="review-item__top">
+                <span class="review-avatar" aria-hidden="true">{{ initials(verificationName(item)) }}</span>
+                <div class="review-item__identity"><h3>{{ verificationName(item) }}</h3><p>{{ item.user?.email || 'Correo no disponible' }}</p></div>
+                <span class="status-pill status-pill--pending">Pendiente</span>
+              </div>
+              <div class="review-meta">
+                <span><ion-icon name="people-outline" aria-hidden="true"></ion-icon>{{ roleLabel(item.role) }}</span>
+                <span *ngIf="item.created_at"><ion-icon name="time-outline" aria-hidden="true"></ion-icon>{{ formatDate(item.created_at) }}</span>
+              </div>
+              <div class="review-actions">
+                <ion-button fill="outline" color="danger" [disabled]="updatingVerificationId !== null" (click)="reviewVerification(item, 'reject')">Rechazar</ion-button>
+                <ion-button [disabled]="updatingVerificationId !== null" (click)="reviewVerification(item, 'approve')">
+                  <ion-spinner *ngIf="updatingVerificationId === item.id" name="crescent" aria-hidden="true"></ion-spinner>
+                  <span *ngIf="updatingVerificationId !== item.id">Aprobar</span>
+                </ion-button>
+              </div>
+            </article>
+          </div>
+
+          <app-empty-state *ngIf="!loadingVerifications && !verifications.length" [compact]="true" icon="shield-checkmark-outline" title="Todo al día" description="No hay solicitudes de verificación pendientes."></app-empty-state>
+        </section>
+
+        <section class="admin-panel" aria-labelledby="reports-heading">
+          <div class="panel-heading">
+            <span class="panel-heading__icon panel-heading__icon--report"><ion-icon name="flag-outline" aria-hidden="true"></ion-icon></span>
+            <div><h2 id="reports-heading">Reportes</h2><p>Casos abiertos que requieren una decisión.</p></div>
+            <span class="panel-count panel-count--report">{{ reports.length }}</span>
+          </div>
+
+          <app-loading-state *ngIf="loadingReports" [compact]="true" title="Cargando reportes" description="Revisando casos abiertos."></app-loading-state>
+
+          <div class="review-list" *ngIf="!loadingReports && reports.length">
+            <article class="review-item" *ngFor="let report of reports; trackBy: trackById">
+              <div class="review-item__top">
+                <span class="review-avatar review-avatar--report" aria-hidden="true"><ion-icon name="alert-outline"></ion-icon></span>
+                <div class="review-item__identity"><h3>{{ reportTitle(report) }}</h3><p>{{ report.reason }}</p></div>
+                <span class="status-pill status-pill--open">Abierto</span>
+              </div>
+              <div class="review-meta">
+                <span><ion-icon name="person-outline" aria-hidden="true"></ion-icon>{{ reporterName(report) }}</span>
+                <span *ngIf="report.created_at"><ion-icon name="time-outline" aria-hidden="true"></ion-icon>{{ formatDate(report.created_at) }}</span>
+              </div>
+              <div class="review-actions">
+                <ion-button fill="clear" color="medium" [disabled]="updatingReportId !== null" (click)="updateReport(report, 'dismissed')">Desestimar</ion-button>
+                <ion-button fill="outline" [disabled]="updatingReportId !== null" (click)="updateReport(report, 'resolved')">
+                  <ion-spinner *ngIf="updatingReportId === report.id" name="crescent" aria-hidden="true"></ion-spinner>
+                  <span *ngIf="updatingReportId !== report.id">Resolver</span>
+                </ion-button>
+              </div>
+            </article>
+          </div>
+
+          <app-empty-state *ngIf="!loadingReports && !reports.length" [compact]="true" icon="checkmark-done-outline" title="Sin casos abiertos" description="No hay reportes pendientes de moderación."></app-empty-state>
+        </section>
+      </div>
+    </main>
   </div>
 </ion-content>

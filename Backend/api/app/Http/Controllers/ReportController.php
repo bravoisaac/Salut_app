@@ -10,19 +10,24 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
+
+        $data = $request->validate([
+            'status' => 'nullable|in:open,resolved,dismissed',
+            'per_page' => 'nullable|integer|min:1|max:50',
+        ]);
 
         $query = Report::query()
             ->with('reporter:id,name,email,role')
             ->latest();
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status'));
+        if (isset($data['status'])) {
+            $query->where('status', $data['status']);
         }
 
-        return response()->json($query->paginate(20));
+        return response()->json($query->paginate($data['per_page'] ?? 20));
     }
 
     public function store(Request $request)
@@ -47,7 +52,7 @@ class ReportController extends Controller
     public function update(Request $request, Report $report)
     {
         $user = $request->user();
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 

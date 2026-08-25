@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { IonicModule } from '@ionic/angular';
+import { Subscription } from 'rxjs';
 
+import { AppUser, ChatMessage, ChatThread } from '../../app.models';
 import { AuthService } from '../../services/auth.service';
 import { ChatService } from '../../services/chat.service';
 import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
@@ -16,88 +18,74 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state.
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, RouterModule, EmptyStateComponent, LoadingStateComponent],
 })
-export class ChatsPage implements OnInit {
+export class ChatsPage implements OnInit, OnDestroy {
+  private readonly authService = inject(AuthService);
+  private readonly chatService = inject(ChatService);
+  private readonly route = inject(ActivatedRoute);
   loading = false;
+  openingChat = false;
   sending = false;
   errorMsg = '';
-  successMsg = '';
-  currentUser: any = null;
-  chats: any[] = [];
-  selectedChat: any = null;
+  currentUser: AppUser | null = null;
+  chats: ChatThread[] = [];
+  selectedChat: ChatThread | null = null;
   messageBody = '';
   private pendingChatId: number | null = null;
-
-  constructor(
-    private authService: AuthService,
-    private chatService: ChatService,
-    private route: ActivatedRoute,
-  ) {}
+  private routeSubscription?: Subscription;
 
   async ngOnInit() {
     this.currentUser = await this.resolveCurrentUser();
-    this.route.queryParamMap.subscribe(params => {
+    this.routeSubscription = this.route.queryParamMap.subscribe(params => {
       const chatId = Number(params.get('chat'));
       this.pendingChatId = Number.isFinite(chatId) && chatId > 0 ? chatId : null;
-      if (this.pendingChatId) {
-        this.openChat({ id: this.pendingChatId });
-      }
     });
     this.loadChats();
   }
 
-  private async resolveCurrentUser() {
-    const storedUser = await this.authService.getUser();
-    if (storedUser?.id) {
-      return storedUser;
-    }
+  ngOnDestroy() {
+    this.routeSubscription?.unsubscribe();
+  }
 
-    return new Promise<any>((resolve) => {
+  private async resolveCurrentUser(): Promise<AppUser | null> {
+    const storedUser = await this.authService.getUser();
+    if (storedUser?.id) return storedUser as AppUser;
+    return new Promise(resolve => {
       this.authService.me().subscribe({
-        next: async (res: any) => {
-          if (res?.id) {
-            await this.authService.setUser(res);
-          }
-          resolve(res);
+        next: async (res) => {
+          const user = res as AppUser;
+          if (user.id) await this.authService.setUser(user);
+          resolve(user);
         },
         error: () => resolve(null),
       });
     });
   }
 
-  loadChats() {
-    this.loading = true;
+  loadChats(background = false) {
+    if (!background) this.loading = true;
     this.errorMsg = '';
-
     this.chatService.list().subscribe({
-      next: (res: any) => {
-        this.chats = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        if (this.pendingChatId && !this.selectedChat) {
-          this.openChat({ id: this.pendingChatId });
+      next: (res) => {
+        this.chats = Array.isArray(res?.data) ? res.data : [];
+        const targetId = this.pendingChatId || this.selectedChat?.id;
+        if (targetId) {
+          const target = this.chats.find(chat => chat.id === targetId) || { id: targetId };
+          this.pendingChatId = null;
+          this.openChat(target);
         }
       },
-      error: (err: any) => {
-        this.errorMsg = err?.error?.message || 'No se pudieron cargar los chats';
-      },
-    }).add(() => {
-      this.loading = false;
-    });
+      error: (err) => this.errorMsg = err?.error?.message || 'No se pudieron cargar las conversaciones.',
+    }).add(() => this.loading = false);
   }
 
-  openChat(chat: any) {
-    if (!chat?.id) {
-      return;
-    }
-
+  openChat(chat: ChatThread) {
+    if (!chat.id || this.openingChat) return;
+    this.openingChat = true;
     this.errorMsg = '';
-    this.successMsg = '';
-    this.chatService.get(Number(chat.id)).subscribe({
-      next: (res: any) => {
-        this.selectedChat = res;
-      },
-      error: (err: any) => {
-        this.errorMsg = err?.error?.message || 'No se pudo abrir el chat';
-      },
-    });
+    this.chatService.get(chat.id).subscribe({
+      next: (res) => this.selectedChat = res,
+      error: (err) => this.errorMsg = err?.error?.message || 'No se pudo abrir la conversación.',
+    }).add(() => this.openingChat = false);
   }
 
   closeChat() {
@@ -107,62 +95,63 @@ export class ChatsPage implements OnInit {
 
   sendMessage() {
     const body = this.messageBody.trim();
-    if (!this.selectedChat?.id || !body || this.sending) {
-      return;
-    }
-
+    if (!this.selectedChat?.id || !body || this.sending) return;
     this.sending = true;
     this.errorMsg = '';
-    this.successMsg = '';
-
-    this.chatService.sendMessage(Number(this.selectedChat.id), body).subscribe({
-      next: (message: any) => {
-        const messages = Array.isArray(this.selectedChat?.messages) ? this.selectedChat.messages : [];
-        this.selectedChat = {
-          ...this.selectedChat,
-          messages: [...messages, message],
-        };
+    this.chatService.sendMessage(this.selectedChat.id, body).subscribe({
+      next: (message) => {
+        const current = this.selectedChat as ChatThread;
+        this.selectedChat = { ...current, messages: [...(current.messages || []), message], updated_at: message.created_at };
+        const updatedSummary = { ...current, messages: [message], updated_at: message.created_at };
+        this.chats = [updatedSummary, ...this.chats.filter(chat => chat.id !== current.id)];
         this.messageBody = '';
-        this.successMsg = 'Mensaje enviado';
-        this.loadChats();
       },
-      error: (err: any) => {
-        this.errorMsg = err?.error?.message || 'No se pudo enviar el mensaje';
-      },
-    }).add(() => {
-      this.sending = false;
-    });
+      error: (err) => this.errorMsg = err?.error?.message || 'No se pudo enviar el mensaje.',
+    }).add(() => this.sending = false);
   }
 
-  chatTitle(chat: any) {
+  chatTitle(chat: ChatThread) {
     const users = this.otherParticipants(chat);
-    if (!users.length) {
-      return 'Chat';
-    }
-    return users.map((user: any) => user?.name || user?.email || `Usuario #${user?.id || '-'}`).join(', ');
+    return users.length ? users.map(user => user.name || user.email || `Usuario #${user.id}`).join(', ') : 'Conversación';
   }
 
-  lastMessage(chat: any) {
-    const messages = Array.isArray(chat?.messages) ? chat.messages : [];
-    const message = messages[0];
-    return message?.body || 'Sin mensajes';
+  lastMessage(chat: ChatThread) {
+    return chat.messages?.[0]?.body?.trim() || 'Aún no hay mensajes';
   }
 
-  messageSender(message: any) {
-    if (Number(message?.sender_id) === Number(this.currentUser?.id)) {
-      return 'Tu';
-    }
-    return message?.sender?.name || message?.sender?.email || 'Usuario';
+  messageSender(message: ChatMessage) {
+    return Number(message.sender_id) === Number(this.currentUser?.id) ? 'Tú' : message.sender?.name || message.sender?.email || 'Usuario';
   }
 
-  isOwnMessage(message: any) {
-    return Number(message?.sender_id) === Number(this.currentUser?.id);
+  isOwnMessage(message: ChatMessage) {
+    return Number(message.sender_id) === Number(this.currentUser?.id);
   }
 
-  private otherParticipants(chat: any) {
-    const participants = Array.isArray(chat?.participants) ? chat.participants : [];
-    return participants
-      .map((participant: any) => participant?.user)
-      .filter((user: any) => user && Number(user.id) !== Number(this.currentUser?.id));
+  initials(value: string) {
+    return value.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'CH';
+  }
+
+  conversationTime(chat: ChatThread) {
+    const value = chat.messages?.[0]?.created_at || chat.updated_at;
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const today = new Date();
+    return date.toDateString() === today.toDateString()
+      ? new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(date)
+      : new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short' }).format(date);
+  }
+
+  messageTime(value: string) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(date);
+  }
+
+  trackById(_: number, item: { id: number }) {
+    return item.id;
+  }
+
+  private otherParticipants(chat: ChatThread): AppUser[] {
+    return (chat.participants || []).map(participant => participant.user).filter((user): user is AppUser => !!user && Number(user.id) !== Number(this.currentUser?.id));
   }
 }
